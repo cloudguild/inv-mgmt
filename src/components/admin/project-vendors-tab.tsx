@@ -14,7 +14,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Building2, Plus, FileText, DollarSign, Pencil, Trash2, Upload,
+  Building2, Plus, FileText, DollarSign, Pencil, Trash2, Upload, Download,
 } from "lucide-react";
 
 const VENDOR_TYPES = [
@@ -57,6 +57,7 @@ interface VendorDoc {
   amount: string | null;
   docDate: string | null;
   notes: string | null;
+  s3Key: string | null;
   createdAt: string;
   uploader: { id: string; name: string };
 }
@@ -90,10 +91,12 @@ export function ProjectVendorsTab({ projectId }: { projectId: string }) {
   const [editOpen, setEditOpen] = useState(false);
   const [docOpen, setDocOpen] = useState(false);
   const [txOpen, setTxOpen] = useState(false);
+  const [docUploading, setDocUploading] = useState(false);
 
   // forms
   const [vendorForm, setVendorForm] = useState(EMPTY_VENDOR);
   const [docForm, setDocForm] = useState({ docType: "", title: "", filename: "", amount: "", docDate: "", notes: "" });
+  const [docFile, setDocFile] = useState<File | null>(null);
   const [txForm, setTxForm] = useState({ date: "", amount: "", txType: "", description: "", reference: "" });
 
   // filters
@@ -190,17 +193,44 @@ export function ProjectVendorsTab({ projectId }: { projectId: string }) {
 
   const handleAddDoc = async () => {
     if (!selected) return;
+    setDocUploading(true);
+    let s3Key: string | undefined;
+    let filename = docForm.filename;
+
+    if (docFile) {
+      // 1. Get presigned upload URL
+      const urlRes = await api.post("/api/upload", {
+        filename: docFile.name,
+        contentType: docFile.type || "application/octet-stream",
+        folder: `vendors/${selected.id}`,
+      });
+      if (urlRes.ok) {
+        const { uploadUrl, key } = await urlRes.json();
+        // 2. Upload directly to S3
+        await fetch(uploadUrl, {
+          method: "PUT",
+          body: docFile,
+          headers: { "Content-Type": docFile.type || "application/octet-stream" },
+        });
+        s3Key = key;
+        filename = docFile.name;
+      }
+    }
+
     const res = await api.post(`/api/vendors/${selected.id}/documents`, {
       ...docForm,
+      filename,
+      s3Key,
       amount: docForm.amount ? parseFloat(docForm.amount) : null,
     });
     if (res.ok) {
       await loadDocs(selected.id);
       setDocOpen(false);
       setDocForm({ docType: "", title: "", filename: "", amount: "", docDate: "", notes: "" });
-      // refresh count
+      setDocFile(null);
       await loadVendors();
     }
+    setDocUploading(false);
   };
 
   const handleDeleteDoc = async (docId: string) => {
@@ -371,9 +401,22 @@ export function ProjectVendorsTab({ projectId }: { projectId: string }) {
                             <td className="px-3 py-2 text-gray-500">{d.docDate ? formatDate(d.docDate) : "—"}</td>
                             <td className="px-3 py-2 text-gray-500">{d.uploader.name}</td>
                             <td className="px-3 py-2">
-                              <button onClick={() => handleDeleteDoc(d.id)} className="text-red-400 hover:text-red-600">
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
+                              <div className="flex items-center gap-2">
+                                {d.s3Key && (
+                                  <button
+                                    onClick={async () => {
+                                      const r = await api.get(`/api/download?key=${encodeURIComponent(d.s3Key!)}`);
+                                      if (r.ok) { const { url } = await r.json(); window.open(url, "_blank"); }
+                                    }}
+                                    className="text-blue-500 hover:text-blue-700"
+                                  >
+                                    <Download className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                                <button onClick={() => handleDeleteDoc(d.id)} className="text-red-400 hover:text-red-600">
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -480,7 +523,21 @@ export function ProjectVendorsTab({ projectId }: { projectId: string }) {
               </Select>
             </div>
             <Field label="Title" value={docForm.title} onChange={(v) => setDocForm((f) => ({ ...f, title: v }))} />
-            <Field label="Filename" value={docForm.filename} onChange={(v) => setDocForm((f) => ({ ...f, filename: v }))} />
+            <div>
+              <Label>File</Label>
+              <input
+                type="file"
+                className="block w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border file:border-gray-300 file:text-sm file:bg-gray-50 hover:file:bg-gray-100 cursor-pointer mt-1"
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  setDocFile(f);
+                  if (f) setDocForm((df) => ({ ...df, filename: f.name }));
+                }}
+              />
+              {!docFile && (
+                <Field label="Or enter filename manually" value={docForm.filename} onChange={(v) => setDocForm((f) => ({ ...f, filename: v }))} />
+              )}
+            </div>
             <Field label="Amount (optional)" type="number" value={docForm.amount} onChange={(v) => setDocForm((f) => ({ ...f, amount: v }))} />
             <Field label="Document Date (optional)" type="date" value={docForm.docDate} onChange={(v) => setDocForm((f) => ({ ...f, docDate: v }))} />
             <div>
@@ -490,7 +547,9 @@ export function ProjectVendorsTab({ projectId }: { projectId: string }) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDocOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddDoc} disabled={!docForm.docType || !docForm.title || !docForm.filename}>Add</Button>
+            <Button onClick={handleAddDoc} disabled={!docForm.docType || !docForm.title || (!docForm.filename && !docFile) || docUploading}>
+              {docUploading ? "Uploading…" : "Add"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

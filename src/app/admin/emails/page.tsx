@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { AppLayout } from "@/components/layout/app-layout";
 import { api } from "@/lib/api";
@@ -30,6 +30,7 @@ interface Message {
   fromEmail: string;
   toEmail: string;
   bodyHtml: string;
+  bodyText: string | null;
   sentAt: string;
   isOutbound: boolean;
   attachments: { name: string; s3Key: string; size: number }[] | null;
@@ -45,7 +46,7 @@ interface ThreadDetail {
 
 interface Project { id: string; name: string }
 
-export default function EmailsPage() {
+function EmailsInner() {
   const searchParams = useSearchParams();
   const [connected, setConnected] = useState(false);
   const [outlookEmail, setOutlookEmail] = useState("");
@@ -283,5 +284,13 @@ export default function EmailsPage() {
         )}
       </div>
     </AppLayout>
+  );
+}
+
+export default function EmailsPage() {
+  return (
+    <Suspense fallback={null}>
+      <EmailsInner />
+    </Suspense>
   );
 }

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Building2, Users, FileText, Bell, LogOut,
-  TrendingUp, CreditCard, Settings, BarChart3, ClipboardList,
+  TrendingUp, CreditCard, BarChart3, ClipboardList, Mail,
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
 import { cn } from "@/lib/utils";
@@ -44,6 +44,7 @@ export function Sidebar({ notificationCount = 0, withdrawalCount = 0 }: SidebarP
     { label: "Projects", href: "/admin/projects", icon: Building2 },
     { label: "Users", href: "/admin/users", icon: Users },
     { label: "Withdrawals", href: "/admin/withdrawals", icon: CreditCard, badge: withdrawalCount },
+    { label: "Emails", href: "/admin/emails", icon: Mail },
     { label: "Reports", href: "/admin/reports", icon: BarChart3 },
     { label: "Audit Log", href: "/admin/audit", icon: ClipboardList },
   ];

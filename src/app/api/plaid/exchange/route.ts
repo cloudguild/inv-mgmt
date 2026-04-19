@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth";
 import { plaidClient } from "@/lib/plaid-client";
+import { CountryCode } from "plaid";
 import { encrypt } from "@/lib/encrypt";
 
 export async function POST(req: NextRequest) {
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
   if (institutionId) {
     const instRes = await plaidClient.institutionsGetById({
       institution_id: institutionId,
-      country_codes: ["US"],
+      country_codes: [CountryCode.Us],
     });
     institutionName = instRes.data.institution.name;
   }

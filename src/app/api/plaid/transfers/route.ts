@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser, isAdmin, isPM } from "@/lib/auth";
-import { plaidClient } from "@/lib/plaid-client";
+import { plaidClient, PLAID_COUNTRY_CODES } from "@/lib/plaid-client";
+import { TransferType, TransferNetwork, ACHClass } from "plaid";
 import { decrypt } from "@/lib/encrypt";
 
 export async function GET(req: NextRequest) {
@@ -38,8 +39,10 @@ export async function POST(req: NextRequest) {
   if (!conn) return NextResponse.json({ error: "Connection not found" }, { status: 404 });
 
   const access_token = decrypt(conn.accessTokenEnc);
-  const network = "ach";
-  const plaidType = type === "deposit" ? "credit" : "debit";
+  const network = TransferNetwork.Ach;
+  const plaidType: TransferType = type === "deposit" ? TransferType.Credit : TransferType.Debit;
+  const achClass = ACHClass.Ppd;
+  const dbUser = await prisma.user.findUnique({ where: { id: user.userId } });
 
   // Create authorization
   const authRes = await plaidClient.transferAuthorizationCreate({
@@ -48,8 +51,8 @@ export async function POST(req: NextRequest) {
     type: plaidType,
     network,
     amount: amount.toString(),
-    ach_class: "ppd",
-    user: { legal_name: (await prisma.user.findUnique({ where: { id: user.userId } }))?.name ?? "" },
+    ach_class: achClass,
+    user: { legal_name: dbUser?.name ?? "" },
   });
 
   if (authRes.data.authorization.decision !== "approved") {
@@ -65,8 +68,8 @@ export async function POST(req: NextRequest) {
     amount: amount.toString(),
     network,
     type: plaidType,
-    ach_class: "ppd",
-    user: { legal_name: "" },
+    ach_class: achClass,
+    user: { legal_name: dbUser?.name ?? "" },
   });
 
   const ft = await prisma.fundTransfer.create({

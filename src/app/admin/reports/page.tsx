@@ -97,7 +97,7 @@ export default function AdminReportsPage() {
             <CardContent>
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
-                  <Pie data={expenseChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${(percent*100).toFixed(0)}%`}>
+                  <Pie data={expenseChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ percent }) => `${((percent ?? 0)*100).toFixed(0)}%`}>
                     {expenseChartData.map((_,i) => <Cell key={i} fill={COLORS[i%COLORS.length]} />)}
                   </Pie>
                   <Tooltip formatter={(v) => formatCurrency(v as number)} />
