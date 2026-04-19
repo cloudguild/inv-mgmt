@@ -1,0 +1,693 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum RoleType {
+  admin
+  pm
+  lender
+  investor
+}
+
+enum ProjectType {
+  lending
+  equity
+  both
+}
+
+enum RagStatus {
+  green
+  amber
+  red
+}
+
+enum AccountType {
+  checking
+  savings
+  business_checking
+}
+
+enum VerificationStatus {
+  pending
+  verified
+  failed
+}
+
+enum WithdrawalType {
+  interest
+  principal
+  profit_distribution
+  partial
+}
+
+enum WithdrawalStatus {
+  draft
+  pending
+  approved
+  rejected
+  processing
+  completed
+}
+
+enum SigningStatus {
+  draft
+  pending
+  signed
+  expired
+}
+
+enum TaskStatus {
+  not_started
+  in_progress
+  complete
+}
+
+enum PhaseStatus {
+  not_started
+  in_progress
+  complete
+}
+
+enum UpdateType {
+  issue
+  milestone
+  info
+}
+
+enum UpdateStatus {
+  open
+  resolved
+  closed
+}
+
+enum PayoutType {
+  interest_payment
+  principal_repayment
+  profit_distribution
+  partial_withdrawal
+  final_payout
+}
+
+enum ExpenseCategory {
+  construction
+  materials
+  labor
+  permits_legal
+  architecture_design
+  management_fees
+  insurance
+  other
+}
+
+enum TransactionType {
+  deposit
+  interest_credit
+  withdrawal
+  payout
+}
+
+enum TransactionStatus {
+  pending
+  completed
+  failed
+}
+
+enum DocType {
+  K1
+  INT_1099
+  agreement
+  amendment
+  disclosure
+}
+
+enum FinancialItemType {
+  source
+  use
+  revenue
+  return_item
+}
+
+enum LendingPositionStatus {
+  active
+  matured
+  closed
+}
+
+model User {
+  id                  String    @id @default(cuid())
+  name                String
+  email               String    @unique
+  passwordHash        String    @map("password_hash")
+  phone               String?
+  isActive            Boolean   @default(true) @map("is_active")
+  outlookRefreshToken String?   @map("outlook_refresh_token")
+  outlookEmail        String?   @map("outlook_email")
+  outlookLinkedAt     DateTime? @map("outlook_linked_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  roles              Role[]
+  lendingPositions   LendingPosition[]
+  equityPositions    EquityPosition[]
+  bankAccounts       BankAccount[]
+  withdrawalRequests WithdrawalRequest[]
+  transactions       Transaction[]
+  notifications      Notification[]
+  documents          Document[]
+  contracts          Contract[]
+  payouts              Payout[]
+  payoutsCreated       Payout[]            @relation("PayoutCreatedBy")
+  expenses             Expense[]
+  trackerUpdates       TrackerUpdate[]
+  tasks                Task[]
+  auditLogs            AuditLog[]
+  vendorDocuments      VendorDocument[]
+  vendorTransactions   VendorTransaction[]
+  emailThreads         EmailThread[]
+  plaidConnections     PlaidConnection[]
+  fundTransfers        FundTransfer[]
+
+  @@map("users")
+}
+
+model Role {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  projectId String?  @map("project_id")
+  role      RoleType
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId, role])
+  @@map("roles")
+}
+
+model Project {
+  id            String      @id @default(cuid())
+  name          String
+  description   String?
+  type          ProjectType
+  budget        Decimal     @db.Decimal(15, 2)
+  targetReturn  Decimal?    @map("target_return") @db.Decimal(5, 2)
+  startDate     DateTime    @map("start_date")
+  endDate       DateTime    @map("end_date")
+  progressPct   Decimal     @default(0) @map("progress_pct") @db.Decimal(5, 2)
+  ragStatus     RagStatus   @default(green) @map("rag_status")
+  isRecommended Boolean     @default(false) @map("is_recommended")
+  isArchived    Boolean     @default(false) @map("is_archived")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  roles              Role[]
+  lendingPositions   LendingPosition[]
+  equityPositions    EquityPosition[]
+  withdrawalRequests WithdrawalRequest[]
+  milestones         Milestone[]
+  phases             ProjectPhase[]
+  expenses           Expense[]
+  payouts            Payout[]
+  contracts          Contract[]
+  trackerUpdates     TrackerUpdate[]
+  transactions       Transaction[]
+  documents          Document[]
+  financialModel       FinancialModel[]
+  assumptions          ProjectAssumptions?
+  vendors              Vendor[]
+  vendorDocuments      VendorDocument[]
+  vendorTransactions   VendorTransaction[]
+  emailThreads         EmailThread[]
+  fundTransfers        FundTransfer[]
+
+  @@map("projects")
+}
+
+model LendingPosition {
+  id           String                @id @default(cuid())
+  userId       String                @map("user_id")
+  projectId    String                @map("project_id")
+  principal    Decimal               @db.Decimal(15, 2)
+  apr          Decimal               @db.Decimal(5, 4)
+  startDate    DateTime              @map("start_date")
+  maturityDate DateTime              @map("maturity_date")
+  status       LendingPositionStatus @default(active)
+  notes        String?
+  createdAt    DateTime              @default(now()) @map("created_at")
+  updatedAt    DateTime              @updatedAt @map("updated_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("lending_positions")
+}
+
+model EquityPosition {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  projectId       String   @map("project_id")
+  amountInvested  Decimal  @map("amount_invested") @db.Decimal(15, 2)
+  equitySharePct  Decimal  @map("equity_share_pct") @db.Decimal(5, 2)
+  projectedReturn Decimal? @map("projected_return") @db.Decimal(15, 2)
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("equity_positions")
+}
+
+model BankAccount {
+  id                 String             @id @default(cuid())
+  userId             String             @map("user_id")
+  accountHolder      String             @map("account_holder")
+  bankName           String             @map("bank_name")
+  accountType        AccountType        @map("account_type")
+  routingLast4       String             @map("routing_last4")
+  accountLast4       String             @map("account_last4")
+  routingEncrypted   String             @map("routing_encrypted")
+  accountEncrypted   String             @map("account_encrypted")
+  nickname           String?
+  isPrimary          Boolean            @default(false) @map("is_primary")
+  verificationStatus VerificationStatus @default(pending) @map("verification_status")
+  verifiedAt         DateTime?          @map("verified_at")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  withdrawalRequests WithdrawalRequest[]
+
+  @@map("bank_accounts")
+}
+
+model WithdrawalRequest {
+  id              String           @id @default(cuid())
+  userId          String           @map("user_id")
+  projectId       String           @map("project_id")
+  bankAccountId   String           @map("bank_account_id")
+  amount          Decimal          @db.Decimal(15, 2)
+  type            WithdrawalType
+  status          WithdrawalStatus @default(draft)
+  notes           String?
+  pmNote          String?          @map("pm_note")
+  approvedBy      String?          @map("approved_by")
+  approvedAt      DateTime?        @map("approved_at")
+  rejectionReason String?          @map("rejection_reason")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id])
+
+  @@map("withdrawal_requests")
+}
+
+model Milestone {
+  id          String    @id @default(cuid())
+  projectId   String    @map("project_id")
+  name        String
+  targetDate  DateTime  @map("target_date")
+  completedAt DateTime? @map("completed_at")
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("milestones")
+}
+
+model ProjectPhase {
+  id        String      @id @default(cuid())
+  projectId String      @map("project_id")
+  name      String
+  startDate DateTime    @map("start_date")
+  endDate   DateTime    @map("end_date")
+  status    PhaseStatus @default(not_started)
+  sortOrder Int         @default(0) @map("sort_order")
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks   Task[]
+
+  @@map("project_phases")
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  phaseId     String     @map("phase_id")
+  name        String
+  assignedTo  String?    @map("assigned_to")
+  dueDate     DateTime?  @map("due_date")
+  status      TaskStatus @default(not_started)
+  completedAt DateTime?  @map("completed_at")
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  phase        ProjectPhase @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  assignedUser User?        @relation(fields: [assignedTo], references: [id])
+
+  @@map("tasks")
+}
+
+model Expense {
+  id            String          @id @default(cuid())
+  projectId     String          @map("project_id")
+  date          DateTime
+  amount        Decimal         @db.Decimal(15, 2)
+  category      ExpenseCategory
+  vendor        String?
+  invoiceNumber String?         @map("invoice_number")
+  notes         String?
+  createdBy     String          @map("created_by")
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  project       Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdByUser User    @relation(fields: [createdBy], references: [id])
+
+  @@map("expenses")
+}
+
+model Payout {
+  id        String     @id @default(cuid())
+  projectId String     @map("project_id")
+  userId    String     @map("user_id")
+  date      DateTime
+  amount    Decimal    @db.Decimal(15, 2)
+  type      PayoutType
+  reference String?
+  notes     String?
+  createdBy String     @map("created_by")
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  project       Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user          User    @relation(fields: [userId], references: [id])
+  createdByUser User    @relation("PayoutCreatedBy", fields: [createdBy], references: [id])
+
+  @@map("payouts")
+}
+
+model Contract {
+  id            String        @id @default(cuid())
+  projectId     String        @map("project_id")
+  userId        String        @map("user_id")
+  filename      String
+  documentType  String        @map("document_type")
+  signingStatus SigningStatus @default(draft) @map("signing_status")
+  signedAt      DateTime?     @map("signed_at")
+  expiryDate    DateTime?     @map("expiry_date")
+  s3Key         String?       @map("s3_key")
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@map("contracts")
+}
+
+model TrackerUpdate {
+  id             String       @id @default(cuid())
+  projectId      String       @map("project_id")
+  title          String
+  updateType     UpdateType   @map("update_type")
+  status         UpdateStatus @default(open)
+  notes          String?
+  notifyPartners Boolean      @default(false) @map("notify_partners")
+  createdBy      String       @map("created_by")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  project       Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdByUser User    @relation(fields: [createdBy], references: [id])
+
+  @@map("tracker_updates")
+}
+
+model Transaction {
+  id        String            @id @default(cuid())
+  userId    String            @map("user_id")
+  projectId String            @map("project_id")
+  type      TransactionType
+  amount    Decimal           @db.Decimal(15, 2)
+  status    TransactionStatus @default(pending)
+  reference String?
+  createdAt DateTime          @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("transactions")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  type      String
+  title     String
+  body      String
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model FinancialModel {
+  id              String            @id @default(cuid())
+  projectId       String            @map("project_id")
+  itemType        FinancialItemType @map("item_type")
+  label           String
+  projectedAmount Decimal           @map("projected_amount") @db.Decimal(15, 2)
+  actualAmount    Decimal?          @map("actual_amount") @db.Decimal(15, 2)
+  sortOrder       Int               @default(0) @map("sort_order")
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("financial_model")
+}
+
+model ProjectAssumptions {
+  id                     String   @id @default(cuid())
+  projectId              String   @unique @map("project_id")
+
+  // Land & Construction
+  landCost               Decimal  @default(0) @map("land_cost") @db.Decimal(15, 2)
+  constructionCostPerSft Decimal  @default(0) @map("construction_cost_per_sft") @db.Decimal(10, 2)
+  builtAreaSft           Decimal  @default(0) @map("built_area_sft") @db.Decimal(12, 2)
+  leasingCommission      Decimal  @default(0) @map("leasing_commission") @db.Decimal(15, 2)
+  entitlementCosts       Decimal  @default(0) @map("entitlement_costs") @db.Decimal(15, 2)
+  tenantImprovements     Decimal  @default(0) @map("tenant_improvements") @db.Decimal(15, 2)
+  interiorBuildOut       Decimal  @default(0) @map("interior_build_out") @db.Decimal(15, 2)
+
+  // Construction Financing
+  ltcPct                 Decimal  @default(0.75) @map("ltc_pct") @db.Decimal(6, 4)
+  constructionRate       Decimal  @default(0.075) @map("construction_rate") @db.Decimal(6, 4)
+  buildPeriodYears       Decimal  @default(1.5) @map("build_period_years") @db.Decimal(5, 2)
+  avgDrawFactor          Decimal  @default(0.55) @map("avg_draw_factor") @db.Decimal(5, 3)
+  originationFeePct      Decimal  @default(0.01) @map("origination_fee_pct") @db.Decimal(5, 4)
+
+  // Revenue
+  rentRatePerSftYear     Decimal  @default(0) @map("rent_rate_per_sft_year") @db.Decimal(10, 2)
+
+  // Permanent Loan
+  permanentLoanTermYears Int      @default(25) @map("permanent_loan_term_years")
+  permanentLoanRate      Decimal  @default(0.075) @map("permanent_loan_rate") @db.Decimal(6, 4)
+
+  // Exit Scenarios
+  capRate1               Decimal  @default(0.055) @map("cap_rate_1") @db.Decimal(6, 4)
+  capRate2               Decimal  @default(0.060) @map("cap_rate_2") @db.Decimal(6, 4)
+  capRate3               Decimal  @default(0.0625) @map("cap_rate_3") @db.Decimal(6, 4)
+  salesCommissionPct     Decimal  @default(0.06) @map("sales_commission_pct") @db.Decimal(5, 4)
+  recommendedLtv         Decimal  @default(0.65) @map("recommended_ltv") @db.Decimal(5, 3)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("project_assumptions")
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  projectId String   @map("project_id")
+  userId    String   @map("user_id")
+  filename  String
+  docType   DocType  @map("doc_type")
+  year      Int?
+  s3Key     String?  @map("s3_key")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@map("documents")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  details    Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model Vendor {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  companyName String   @map("company_name")
+  vendorType  String   @map("vendor_type")
+  contactName String?  @map("contact_name")
+  email       String?
+  phone       String?
+  address     String?
+  city        String?
+  state       String?
+  zip         String?
+  taxId       String?  @map("tax_id")
+  licenseNo   String?  @map("license_no")
+  website     String?
+  notes       String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  project      Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documents    VendorDocument[]
+  transactions VendorTransaction[]
+
+  @@map("vendors")
+}
+
+model EmailThread {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  projectId       String?  @map("project_id")
+  outlookThreadId String   @unique @map("outlook_thread_id")
+  subject         String
+  fromEmail       String   @map("from_email")
+  fromName        String   @map("from_name")
+  lastMessageAt   DateTime @map("last_message_at")
+  messageCount    Int      @default(1) @map("message_count")
+  hasAttachments  Boolean  @default(false) @map("has_attachments")
+  isRead          Boolean  @default(false) @map("is_read")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user     User          @relation(fields: [userId], references: [id])
+  project  Project?      @relation(fields: [projectId], references: [id])
+  messages EmailMessage[]
+
+  @@map("email_threads")
+}
+
+model EmailMessage {
+  id               String   @id @default(cuid())
+  threadId         String   @map("thread_id")
+  outlookMessageId String   @unique @map("outlook_message_id")
+  fromName         String   @map("from_name")
+  fromEmail        String   @map("from_email")
+  toEmail          String   @map("to_email")
+  bodyHtml         String   @map("body_html")
+  bodyText         String?  @map("body_text")
+  sentAt           DateTime @map("sent_at")
+  isOutbound       Boolean  @default(false) @map("is_outbound")
+  attachments      Json?
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  thread EmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@map("email_messages")
+}
+
+model PlaidConnection {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  plaidItemId     String   @unique @map("plaid_item_id")
+  accessTokenEnc  String   @map("access_token_enc")
+  institutionId   String?  @map("institution_id")
+  institutionName String?  @map("institution_name")
+  status          String   @default("active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fundTransfers FundTransfer[]
+
+  @@map("plaid_connections")
+}
+
+model FundTransfer {
+  id                String    @id @default(cuid())
+  userId            String    @map("user_id")
+  projectId         String    @map("project_id")
+  plaidConnectionId String?   @map("plaid_connection_id")
+  type              String
+  amount            Decimal   @db.Decimal(15, 2)
+  status            String    @default("pending")
+  plaidTransferId   String?   @map("plaid_transfer_id")
+  description       String?
+  notes             String?
+  initiatedAt       DateTime  @default(now()) @map("initiated_at")
+  completedAt       DateTime? @map("completed_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  user            User             @relation(fields: [userId], references: [id])
+  project         Project          @relation(fields: [projectId], references: [id])
+  plaidConnection PlaidConnection? @relation(fields: [plaidConnectionId], references: [id])
+
+  @@map("fund_transfers")
+}
+
+model VendorDocument {
+  id          String    @id @default(cuid())
+  vendorId    String    @map("vendor_id")
+  projectId   String    @map("project_id")
+  docType     String    @map("doc_type")
+  title       String
+  filename    String
+  amount      Decimal?  @db.Decimal(15, 2)
+  docDate     DateTime? @map("doc_date")
+  notes       String?
+  s3Key       String?   @map("s3_key")
+  uploadedBy  String    @map("uploaded_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  vendor   Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploader User    @relation(fields: [uploadedBy], references: [id])
+
+  @@map("vendor_documents")
+}
+
+model VendorTransaction {
+  id          String   @id @default(cuid())
+  vendorId    String   @map("vendor_id")
+  projectId   String   @map("project_id")
+  date        DateTime
+  amount      Decimal  @db.Decimal(15, 2)
+  txType      String   @map("tx_type")
+  description String?
+  reference   String?
+  createdBy   String   @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  vendor  Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  creator User    @relation(fields: [createdBy], references: [id])
+
+  @@map("vendor_transactions")
+}
