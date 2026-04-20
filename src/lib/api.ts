@@ -1,5 +1,3 @@
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
   try {
@@ -20,15 +18,14 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const response = await fetch(`${BASE_URL}${url}`, { ...options, headers });
+  const response = await fetch(url, { ...options, headers });
 
   if (response.status === 401) {
-    // Try refresh
     const refreshStored = localStorage.getItem("auth-storage");
     const refreshParsed = refreshStored ? JSON.parse(refreshStored) : null;
     const refreshToken = refreshParsed?.state?.refreshToken;
     if (refreshToken) {
-      const refreshRes = await fetch(`${BASE_URL}/api/auth/refresh`, {
+      const refreshRes = await fetch("/api/auth/refresh", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken }),
@@ -42,7 +39,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
           localStorage.setItem("auth-storage", JSON.stringify(parsed));
         }
         headers["Authorization"] = `Bearer ${accessToken}`;
-        return fetch(`${BASE_URL}${url}`, { ...options, headers });
+        return fetch(url, { ...options, headers });
       }
     }
   }
