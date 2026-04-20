@@ -6,11 +6,25 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-function createPrismaClient() {
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL?.includes("supabase") ? { rejectUnauthorized: false } : false,
+function buildPool() {
+  const rawUrl = process.env.DATABASE_URL ?? "";
+  // Strip sslmode from URL — pg v9+ treats 'require'/'prefer' as 'verify-full',
+  // which overrides rejectUnauthorized. We control SSL via the ssl option instead.
+  let connectionString = rawUrl;
+  try {
+    const u = new URL(rawUrl);
+    u.searchParams.delete("sslmode");
+    connectionString = u.toString();
+  } catch { /* not a valid URL, use as-is */ }
+
+  return new Pool({
+    connectionString,
+    ssl: rawUrl.length > 0 ? { rejectUnauthorized: false } : false,
   });
+}
+
+function createPrismaClient() {
+  const pool = buildPool();
   const adapter = new PrismaPg(pool);
   return new PrismaClient({
     adapter,
