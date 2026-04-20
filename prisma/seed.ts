@@ -1,9 +1,14 @@
+import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import bcrypt from "bcryptjs";
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/real_estate_portal" });
+const rawUrl = process.env.DATABASE_URL ?? "";
+let connectionString = rawUrl;
+try { const u = new URL(rawUrl); u.searchParams.delete("sslmode"); connectionString = u.toString(); } catch { /* ignore */ }
+
+const pool = new Pool({ connectionString, ssl: rawUrl.length > 0 ? { rejectUnauthorized: false } : false });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
