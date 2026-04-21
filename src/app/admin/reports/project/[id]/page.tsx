@@ -44,9 +44,14 @@ export default function ProjectReportPage({ params }: { params: Promise<{ id: st
     a.click();
   };
 
-  if (loading || !data) return (
+  if (loading) return (
     <AppLayout title="Project Report" requireAdminOrPM>
       <div className="flex justify-center py-16"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-700" /></div>
+    </AppLayout>
+  );
+  if (!data) return (
+    <AppLayout title="Project Report" requireAdminOrPM>
+      <div className="flex justify-center py-16 text-gray-500">Failed to load report.</div>
     </AppLayout>
   );
 

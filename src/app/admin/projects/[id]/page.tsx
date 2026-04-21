@@ -36,26 +36,40 @@ export default function ProjectHubPage({ params }: { params: Promise<{ id: strin
   const [activeTab, setActiveTab] = useState("overview");
 
   const loadProject = async () => {
-    const res = await api.get(`/api/projects/${id}`);
-    if (res.ok) {
-      const data = await res.json();
-      // PM can only access their own projects
-      if (!isAdmin() && isPM() && !isPM(id)) {
-        router.replace("/admin/projects");
-        return;
+    try {
+      const res = await api.get(`/api/projects/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (!isAdmin() && isPM() && !isPM(id)) {
+          router.replace("/admin/projects");
+          return;
+        }
+        setProject(data);
       }
-      setProject(data);
+    } catch (e) {
+      console.error("Failed to load project", e);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => { loadProject(); }, [id]);
 
-  if (loading || !project) {
+  if (loading) {
     return (
       <AppLayout title="Project Hub">
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-700" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!project) {
+    return (
+      <AppLayout title="Project Hub">
+        <div className="flex items-center justify-center h-64 text-gray-500">
+          Project not found or you don&apos;t have access.
         </div>
       </AppLayout>
     );
