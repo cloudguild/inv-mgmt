@@ -20,6 +20,7 @@ function buildPool() {
   return new Pool({
     connectionString,
     ssl: rawUrl.length > 0 ? { rejectUnauthorized: false } : false,
+    max: 1, // serverless: one connection per function instance
   });
 }
 
