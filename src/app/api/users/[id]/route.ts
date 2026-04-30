@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser, isAdmin, isPM, hashPassword } from "@/lib/auth";
+import { sendDeactivationEmail, sendProfileUpdateEmail, sendDeletionEmail } from "@/lib/email";
 
 const USER_SELECT = {
   id: true, name: true, email: true, phone: true, isActive: true, createdAt: true,
@@ -53,19 +54,40 @@ export async function PUT(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const existing = await prisma.user.findUnique({ where: { id }, select: { name: true, email: true, isActive: true } });
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
   const data = await req.json();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateData: any = {};
-  if (data.name !== undefined) updateData.name = data.name;
+  const changes: string[] = [];
+
+  if (data.name !== undefined && data.name !== existing.name) {
+    updateData.name = data.name;
+    changes.push(`Name changed to "${data.name}"`);
+  }
   if (data.phone !== undefined) updateData.phone = data.phone || null;
-  if (data.isActive !== undefined) updateData.isActive = data.isActive;
-  if (data.password) updateData.passwordHash = await hashPassword(data.password);
+  if (data.isActive !== undefined && data.isActive !== existing.isActive) {
+    updateData.isActive = data.isActive;
+    changes.push(data.isActive ? "Account reactivated" : "Account deactivated");
+  }
+  if (data.password) {
+    updateData.passwordHash = await hashPassword(data.password);
+    changes.push("Password changed");
+  }
 
   const u = await prisma.user.update({
     where: { id },
     data: updateData,
     select: USER_SELECT,
   });
+
+  if (data.isActive === false && existing.isActive) {
+    await sendDeactivationEmail(existing.email, existing.name).catch(() => {});
+  } else if (changes.length > 0) {
+    await sendProfileUpdateEmail(existing.email, existing.name, changes).catch(() => {});
+  }
+
   return NextResponse.json(u);
 }
 
@@ -78,7 +100,20 @@ export async function DELETE(
   if (!actor || !isAdmin(actor)) {
     return NextResponse.json({ error: "Forbidden — only admin can delete users" }, { status: 403 });
   }
-  // Soft-delete: deactivate instead of hard delete
-  await prisma.user.update({ where: { id }, data: { isActive: false } });
+
+  const { searchParams } = new URL(req.url);
+  const hard = searchParams.get("hard") === "true";
+
+  const u = await prisma.user.findUnique({ where: { id }, select: { name: true, email: true } });
+  if (!u) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (hard) {
+    await prisma.user.delete({ where: { id } });
+    await sendDeletionEmail(u.email, u.name).catch(() => {});
+  } else {
+    await prisma.user.update({ where: { id }, data: { isActive: false } });
+    await sendDeactivationEmail(u.email, u.name).catch(() => {});
+  }
+
   return NextResponse.json({ ok: true });
 }

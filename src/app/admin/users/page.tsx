@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { formatDate, formatCurrency, getInitials } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth";
-import { Plus, Search, UserCheck, UserX, Pencil, ChevronRight, Trash2 } from "lucide-react";
+import { Plus, Search, UserCheck, UserX, Pencil, ChevronRight, Trash2, AlertTriangle } from "lucide-react";
 
 interface Project { id: string; name: string }
 interface RoleRow { id: string; role: string; project: { id: string; name: string } | null }
@@ -261,9 +261,9 @@ function AddUserDialog({
 // ─── Edit User Dialog ─────────────────────────────────────────────────────────
 
 function EditUserDialog({
-  user, open, onClose, onSaved, projects, isAdminUser,
+  user, open, onClose, onSaved, onDeleted, projects, isAdminUser,
 }: {
-  user: User | null; open: boolean; onClose: () => void; onSaved: () => void;
+  user: User | null; open: boolean; onClose: () => void; onSaved: () => void; onDeleted: () => void;
   projects: Project[]; isAdminUser: boolean;
 }) {
   const [name, setName] = useState("");
@@ -303,6 +303,15 @@ function EditUserDialog({
   const toggleActive = async () => {
     await api.put(`/api/users/${user.id}`, { isActive: !user.isActive });
     onSaved();
+  };
+
+  const deleteUser = async (hard: boolean) => {
+    const msg = hard
+      ? `Permanently DELETE ${user.name}? This cannot be undone.`
+      : `Deactivate ${user.name}? They will not be able to log in.`;
+    if (!confirm(msg)) return;
+    await api.delete(`/api/users/${user.id}${hard ? "?hard=true" : ""}`);
+    onDeleted();
   };
 
   const removeRole = async (roleId: string) => {
@@ -346,11 +355,17 @@ function EditUserDialog({
                 <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Leave blank to keep" />
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button size="sm" onClick={saveProfile} disabled={saving}>{saving ? "Saving…" : "Save Profile"}</Button>
               <Button size="sm" variant="outline" onClick={toggleActive}>
                 {user.isActive ? <><UserX className="h-3 w-3 mr-1" />Deactivate</> : <><UserCheck className="h-3 w-3 mr-1" />Activate</>}
               </Button>
+              {isAdminUser && (
+                <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50"
+                  onClick={() => deleteUser(true)}>
+                  <AlertTriangle className="h-3 w-3 mr-1" /> Delete User
+                </Button>
+              )}
             </div>
           </div>
 
@@ -527,7 +542,7 @@ export default function AdminUsersPage() {
             <div className="relative max-w-sm flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input placeholder="Search users…" className="pl-9" value={search}
-                onChange={(e) => setSearch(e.target.value)} />
+                onChange={(e) => setSearch(e.target.value)} autoComplete="off" />
             </div>
             <Select value={roleFilter} onValueChange={setRoleFilter}>
               <SelectTrigger className="w-36"><SelectValue placeholder="All roles" /></SelectTrigger>
@@ -642,6 +657,7 @@ export default function AdminUsersPage() {
         open={!!editUser}
         onClose={() => setEditUser(null)}
         onSaved={handleEditSaved}
+        onDeleted={() => { setEditUser(null); load(); }}
         projects={projects}
         isAdminUser={isAdminUser}
       />

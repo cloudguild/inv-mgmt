@@ -123,6 +123,12 @@ enum DocType {
   agreement
   amendment
   disclosure
+  permit
+  plan
+  report
+  contract
+  photo
+  other
 }
 
 enum FinancialItemType {

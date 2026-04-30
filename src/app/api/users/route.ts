@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser, isAdmin, isPM, hashPassword } from "@/lib/auth";
+import { sendWelcomeEmail } from "@/lib/email";
 
 const USER_SELECT = {
   id: true, name: true, email: true, phone: true, isActive: true, createdAt: true,
@@ -111,5 +112,7 @@ export async function POST(req: NextRequest) {
     return tx.user.findUnique({ where: { id: targetUser.id }, select: USER_SELECT });
   });
 
+  const rawPassword = password || "ChangeMe123!";
+  await sendWelcomeEmail(email.toLowerCase(), name, rawPassword).catch(() => {});
   return NextResponse.json(newUser, { status: 201 });
 }

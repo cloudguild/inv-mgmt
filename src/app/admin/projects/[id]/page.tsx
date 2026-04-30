@@ -13,6 +13,7 @@ import { ProjectFinancialTab } from "@/components/admin/project-financial-tab";
 import { ProjectExpensesTab } from "@/components/admin/project-expenses-tab";
 import { ProjectPayoutsTab } from "@/components/admin/project-payouts-tab";
 import { ProjectTrackerTab } from "@/components/admin/project-tracker-tab";
+import { ProjectDocumentsTab } from "@/components/admin/project-documents-tab";
 import { Badge } from "@/components/ui/badge";
 
 interface ProjectData {
@@ -104,6 +105,7 @@ export default function ProjectHubPage({ params }: { params: Promise<{ id: strin
             <TabsTrigger value="financial">Financial Model</TabsTrigger>
             <TabsTrigger value="expenses">Expenses</TabsTrigger>
             <TabsTrigger value="payouts">Payouts</TabsTrigger>
+            <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="tracker" className="relative">
               Tracker
               {openIssues > 0 && (
@@ -133,6 +135,9 @@ export default function ProjectHubPage({ params }: { params: Promise<{ id: strin
             </TabsContent>
             <TabsContent value="payouts">
               <ProjectPayoutsTab projectId={id} project={project} />
+            </TabsContent>
+            <TabsContent value="documents">
+              <ProjectDocumentsTab projectId={id} />
             </TabsContent>
             <TabsContent value="tracker">
               <ProjectTrackerTab projectId={id} project={project} />
