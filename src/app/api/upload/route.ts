@@ -13,5 +13,5 @@ export async function POST(req: NextRequest) {
 
   const key = s3Key(folder, filename);
   const uploadUrl = await presignedUploadUrl(key, contentType);
-  return NextResponse.json({ uploadUrl, key });
+  return NextResponse.json({ url: uploadUrl, key });
 }

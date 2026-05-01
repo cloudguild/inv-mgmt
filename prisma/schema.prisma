@@ -522,14 +522,15 @@ model ProjectAssumptions {
 }
 
 model Document {
-  id        String   @id @default(cuid())
-  projectId String   @map("project_id")
-  userId    String   @map("user_id")
-  filename  String
-  docType   DocType  @map("doc_type")
-  year      Int?
-  s3Key     String?  @map("s3_key")
-  createdAt DateTime @default(now()) @map("created_at")
+  id         String   @id @default(cuid())
+  projectId  String   @map("project_id")
+  userId     String   @map("user_id")
+  filename   String
+  docType    DocType  @map("doc_type")
+  year       Int?
+  s3Key      String?  @map("s3_key")
+  shareToken String?  @unique @map("share_token")
+  createdAt  DateTime @default(now()) @map("created_at")
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id])
