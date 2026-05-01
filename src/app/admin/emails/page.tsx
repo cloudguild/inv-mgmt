@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mail, RefreshCw, Link2, Send, Paperclip, ExternalLink } from "lucide-react";
+import { useAuthStore } from "@/store/auth";
 
 interface Thread {
   id: string;
@@ -58,6 +59,8 @@ function EmailsInner() {
   const [replying, setReplying] = useState(false);
   const [showReply, setShowReply] = useState(false);
   const [search, setSearch] = useState("");
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const outlookConnectUrl = `/api/auth/outlook${accessToken ? `?token=${encodeURIComponent(accessToken)}` : ""}`;
 
   const load = useCallback(async (sync = false) => {
     if (sync) setSyncing(true);
@@ -141,7 +144,7 @@ function EmailsInner() {
                 Sync Inbox
               </Button>
             )}
-            <a href="/api/auth/outlook">
+            <a href={outlookConnectUrl}>
               <Button size="sm" variant={connected ? "outline" : "default"}>
                 <ExternalLink className="h-3 w-3 mr-1" />
                 {connected ? "Reconnect Outlook" : "Connect Outlook"}
@@ -155,7 +158,7 @@ function EmailsInner() {
             <CardContent className="flex flex-col items-center justify-center py-16 gap-3 text-center">
               <Mail className="h-12 w-12 text-gray-300" />
               <p className="text-gray-500 font-medium">Connect your Outlook account to start reading emails.</p>
-              <a href="/api/auth/outlook">
+              <a href={outlookConnectUrl}>
                 <Button>Connect Outlook</Button>
               </a>
             </CardContent>
