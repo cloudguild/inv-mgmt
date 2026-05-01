@@ -7,12 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils";
 import { api } from "@/lib/api";
-import { Plus, ChevronDown, ChevronRight, Upload, Pencil, Trash2, Check, X } from "lucide-react";
+import { Plus, ChevronDown, ChevronRight, Upload, Pencil, Trash2, Check, X, List, BarChart2 } from "lucide-react";
 import { parseFileToRows, parsePlanFile } from "@/lib/file-parsers";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { ProjectPlanGantt } from "@/components/admin/project-plan-gantt";
 
 interface Task {
   id: string;
@@ -60,6 +61,7 @@ export function ProjectPlanTab({ projectId, onUpdate }: { projectId: string; pro
   const [phases, setPhases] = useState<Phase[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<"list" | "gantt">("list");
 
   // Phase editing state
   const [editPhaseId, setEditPhaseId] = useState<string | null>(null);
@@ -185,7 +187,7 @@ export function ProjectPlanTab({ projectId, onUpdate }: { projectId: string; pro
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <label className="cursor-pointer">
             <input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleFileUpload} />
@@ -195,9 +197,26 @@ export function ProjectPlanTab({ projectId, onUpdate }: { projectId: string; pro
           </label>
           {importError && <p className="text-sm text-red-600">{importError}</p>}
         </div>
-        <Button onClick={() => setAddPhaseOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Add Phase
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex items-center border rounded-md overflow-hidden">
+            <button
+              className={`flex items-center gap-1 px-3 py-1.5 text-sm font-medium transition-colors ${view === "list" ? "bg-blue-600 text-white" : "hover:bg-gray-50 text-gray-600"}`}
+              onClick={() => setView("list")}
+            >
+              <List className="h-3.5 w-3.5" /> List
+            </button>
+            <button
+              className={`flex items-center gap-1 px-3 py-1.5 text-sm font-medium border-l transition-colors ${view === "gantt" ? "bg-blue-600 text-white" : "hover:bg-gray-50 text-gray-600"}`}
+              onClick={() => setView("gantt")}
+            >
+              <BarChart2 className="h-3.5 w-3.5" /> Gantt
+            </button>
+          </div>
+          <Button onClick={() => setAddPhaseOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Add Phase
+          </Button>
+        </div>
       </div>
 
       {/* Import preview dialog */}
@@ -235,10 +254,13 @@ export function ProjectPlanTab({ projectId, onUpdate }: { projectId: string; pro
         </DialogContent>
       </Dialog>
 
-      {/* Phases */}
-      {phases.length === 0 ? (
+      {/* Gantt view */}
+      {view === "gantt" && <ProjectPlanGantt phases={phases} />}
+
+      {/* List view */}
+      {view === "list" && phases.length === 0 ? (
         <Card><CardContent className="py-8 text-center text-gray-500">No phases defined. Add the first phase to get started.</CardContent></Card>
-      ) : (
+      ) : view === "list" && (
         phases.map((phase) => {
           const completed = phase.tasks.filter((t) => t.status === "complete").length;
           const isExpanded = expanded.has(phase.id);
