@@ -69,7 +69,8 @@ export async function PATCH(
       data: { shareToken: token },
     });
     const { origin } = new URL(req.url);
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || origin;
+    const configuredUrl = process.env.NEXT_PUBLIC_APP_URL;
+    const appUrl = configuredUrl ? new URL(configuredUrl).origin : origin;
     return NextResponse.json({ shareUrl: `${appUrl}/api/share/${updated.shareToken}` });
   }
 
