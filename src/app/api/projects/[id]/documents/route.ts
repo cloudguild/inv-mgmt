@@ -68,7 +68,8 @@ export async function PATCH(
       where: { id: docId },
       data: { shareToken: token },
     });
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+    const { origin } = new URL(req.url);
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || origin;
     return NextResponse.json({ shareUrl: `${appUrl}/api/share/${updated.shareToken}` });
   }
 
